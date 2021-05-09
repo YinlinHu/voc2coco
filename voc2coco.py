@@ -5,18 +5,11 @@
 import sys
 import os
 import json
+import shutil
 import xml.etree.ElementTree as ET
 
 
 START_BOUNDING_BOX_ID = 1
-PRE_DEFINE_CATEGORIES = {}
-# If necessary, pre-define category and its id
-#  PRE_DEFINE_CATEGORIES = {"aeroplane": 1, "bicycle": 2, "bird": 3, "boat": 4,
-                         #  "bottle":5, "bus": 6, "car": 7, "cat": 8, "chair": 9,
-                         #  "cow": 10, "diningtable": 11, "dog": 12, "horse": 13,
-                         #  "motorbike": 14, "person": 15, "pottedplant": 16,
-                         #  "sheep": 17, "sofa": 18, "train": 19, "tvmonitor": 20}
-
 
 def get(root, name):
     vars = root.findall(name)
@@ -41,26 +34,42 @@ def get_filename_as_int(filename):
     except:
         raise NotImplementedError('Filename %s is supposed to be an integer.'%(filename))
 
+def get_defined_categories(labels_file):
+    results = {}
+    current_id = 1
+    list_fp = open(labels_file, 'r')
+    for line in list_fp:
+        line = line.strip()
+        results[line] = current_id
+        current_id += 1
+    list_fp.close()
+    return results
 
-def convert(xml_list, xml_dir, json_file):
-    list_fp = open(xml_list, 'r')
+def convert(jpg_list, labels_file, out_dirname):
+    list_fp = open(jpg_list, 'r')
     json_dict = {"images":[], "type": "instances", "annotations": [],
                  "categories": []}
-    categories = PRE_DEFINE_CATEGORIES
+    categories = get_defined_categories(labels_file)
     bnd_id = START_BOUNDING_BOX_ID
+
+    if not os.path.exists(out_dirname):
+        os.makedirs(out_dirname)
     for line in list_fp:
         line = line.strip()
         print("Processing %s"%(line))
-        xml_f = os.path.join(xml_dir, line)
+        shutil.copy2(line, out_dirname + os.sep + os.path.basename(line))
+        # xml_f = os.path.join(xml_dir, line)
+        xml_f = line.replace('/JPEGImages/', '/Annotations/').replace('.jpg', '.xml')
         tree = ET.parse(xml_f)
         root = tree.getroot()
-        path = get(root, 'path')
-        if len(path) == 1:
-            filename = os.path.basename(path[0].text)
-        elif len(path) == 0:
-            filename = get_and_check(root, 'filename', 1).text
-        else:
-            raise NotImplementedError('%d paths found in %s'%(len(path), line))
+        # path = get(root, 'path')
+        # if len(path) == 1:
+        #     filename = os.path.basename(path[0].text)
+        # elif len(path) == 0:
+        #     filename = get_and_check(root, 'filename', 1).text
+        # else:
+        #     raise NotImplementedError('%d paths found in %s'%(len(path), line))
+        filename = os.path.basename(line)
         ## The filename must be a number
         image_id = get_filename_as_int(filename)
         size = get_and_check(root, 'size', 1)
@@ -97,6 +106,7 @@ def convert(xml_list, xml_dir, json_file):
     for cate, cid in categories.items():
         cat = {'supercategory': 'none', 'id': cid, 'name': cate}
         json_dict['categories'].append(cat)
+    json_file = out_dirname + '.json'
     json_fp = open(json_file, 'w')
     json_str = json.dumps(json_dict)
     json_fp.write(json_str)
@@ -105,9 +115,12 @@ def convert(xml_list, xml_dir, json_file):
 
 
 if __name__ == '__main__':
-    if len(sys.argv) <= 1:
-        print('3 auguments are need.')
-        print('Usage: %s XML_LIST.txt XML_DIR OUTPU_JSON.json'%(sys.argv[0]))
-        exit(1)
-
-    convert(sys.argv[1], sys.argv[2], sys.argv[3])
+    # if len(sys.argv) <= 1:
+    #     print('3 auguments are need.')
+    #     print('Usage: %s XML_LIST.txt XML_DIR OUTPU_JSON.json'%(sys.argv[0]))
+    #     exit(1)
+    # convert(sys.argv[1], sys.argv[2], sys.argv[3])
+    jpgListFile = "/home/yhu/github/cross-domain-detection/datasets/watercolor/test.txt"
+    labelsFile = "/home/yhu/github/cross-domain-detection/datasets/watercolor/labels.txt"
+    outDirName = "./test"
+    convert(jpgListFile, labelsFile, outDirName)
